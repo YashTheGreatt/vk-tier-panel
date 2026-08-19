@@ -3,7 +3,6 @@ from flask import Flask, jsonify, render_template_string, request
 
 app = Flask(__name__)
 
-# Tier sorting rank (Highest on top)
 TIER_ORDER = {
     "HT1": 10, "LT1": 9,
     "HT2": 8,  "LT2": 7,
@@ -30,7 +29,6 @@ def init_db():
 
 init_db()
 
-# --- Mod API Endpoint ---
 @app.route("/api/tiers")
 def get_tiers():
     conn = sqlite3.connect("clan_data.db")
@@ -38,12 +36,10 @@ def get_tiers():
     c.execute("SELECT ign, role_type, gamemode, tier FROM members")
     rows = c.fetchall()
     conn.close()
-    
     return jsonify({
         r[0]: {"type": r[1], "mode": r[2], "tier": r[3]} for r in rows
     })
 
-# --- Public Leaderboard Page ---
 @app.route("/leaderboard")
 def leaderboard():
     conn = sqlite3.connect("clan_data.db")
@@ -82,7 +78,6 @@ def leaderboard():
     <body>
         <h1>⚔️ VOID KNIGHT LEADERBOARDS ⚔️</h1>
         <div class="container">
-            <!-- CPvP Leaderboard -->
             <div class="card">
                 <h3>✦ CPvP Tierlist</h3>
                 <table>
@@ -96,8 +91,6 @@ def leaderboard():
                     {% endfor %}
                 </table>
             </div>
-
-            <!-- Sword Leaderboard -->
             <div class="card">
                 <h3>⚔️ Sword Tierlist</h3>
                 <table>
@@ -111,8 +104,6 @@ def leaderboard():
                     {% endfor %}
                 </table>
             </div>
-
-            <!-- Specialists Leaderboard -->
             <div class="card">
                 <h3>🛠️ Clan Specialists</h3>
                 <table>
@@ -133,7 +124,6 @@ def leaderboard():
     """
     return render_template_string(html, cpvp=cpvp, sword=sword, specialists=specialists)
 
-# --- Admin Management Panel ---
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
     conn = sqlite3.connect("clan_data.db")
