@@ -1,7 +1,9 @@
+import os
 import sqlite3
-from flask import Flask, jsonify, render_template_string, request
+from flask import Flask, jsonify, redirect, render_template_string, request
 
 app = Flask(__name__)
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "clan_data.db")
 
 TIER_ORDER = {
     "HT1": 10, "LT1": 9,
@@ -12,8 +14,12 @@ TIER_ORDER = {
     "OFFICIAL": 0
 }
 
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    return conn
+
 def init_db():
-    conn = sqlite3.connect("clan_data.db")
+    conn = get_db()
     c = conn.cursor()
     c.execute("""
         CREATE TABLE IF NOT EXISTS members (
@@ -29,9 +35,13 @@ def init_db():
 
 init_db()
 
+@app.route("/")
+def index():
+    return redirect("/leaderboard")
+
 @app.route("/api/tiers")
 def get_tiers():
-    conn = sqlite3.connect("clan_data.db")
+    conn = get_db()
     c = conn.cursor()
     c.execute("SELECT ign, role_type, gamemode, tier FROM members")
     rows = c.fetchall()
@@ -42,7 +52,7 @@ def get_tiers():
 
 @app.route("/leaderboard")
 def leaderboard():
-    conn = sqlite3.connect("clan_data.db")
+    conn = get_db()
     c = conn.cursor()
     c.execute("SELECT ign, role_type, gamemode, tier, points FROM members")
     all_members = c.fetchall()
@@ -52,8 +62,8 @@ def leaderboard():
     sword = [m for m in all_members if m[2] == "Sword"]
     specialists = [m for m in all_members if m[1] == "Specialist"]
 
-    cpvp.sort(key=lambda x: TIER_ORDER.get(x[3].upper(), 0), reverse=True)
-    sword.sort(key=lambda x: TIER_ORDER.get(x[3].upper(), 0), reverse=True)
+    cpvp.sort(key=lambda x: TIER_ORDER.get(str(x[3]).upper(), 0), reverse=True)
+    sword.sort(key=lambda x: TIER_ORDER.get(str(x[3]).upper(), 0), reverse=True)
     specialists.sort(key=lambda x: x[4], reverse=True)
 
     html = """
@@ -126,7 +136,7 @@ def leaderboard():
 
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
-    conn = sqlite3.connect("clan_data.db")
+    conn = get_db()
     c = conn.cursor()
 
     if request.method == "POST":
@@ -137,14 +147,22 @@ def admin():
             mode = request.form.get("mode")
             role_type = "Specialist" if mode in ["Builder", "Grinder"] else "Combat"
             tier = request.form.get("tier", "").strip().upper() if role_type == "Combat" else "OFFICIAL"
-            points = int(request.form.get("points", 0)) if role_type == "Specialist" else 0
+            try:
+                points = int(request.form.get("points", 0))
+            except:
+                points = 0
 
             c.execute("INSERT OR REPLACE INTO members (ign, role_type, gamemode, tier, points) VALUES (?, ?, ?, ?, ?)",
                       (ign, role_type, mode, tier, points))
+            conn.commit()
+            conn.close()
+            return redirect("/admin")
+            
         elif action == "delete" and ign:
             c.execute("DELETE FROM members WHERE ign = ?", (ign,))
-        
-        conn.commit()
+            conn.commit()
+            conn.close()
+            return redirect("/admin")
 
     c.execute("SELECT ign, gamemode, tier, points FROM members")
     members = c.fetchall()
